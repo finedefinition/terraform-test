@@ -60,3 +60,34 @@ variable "app_configs_bucket_name" {
   description = "Name of S3 bucket for application configs"
   type        = string
 }
+
+variable "admin_cidr" {
+  description = "CIDR block for admin SSH access"
+  type        = string
+  default     = "0.0.0.0/0"  # Ограничить в production!
+}
+
+# Database variables
+variable "db_instance_class" {
+  description = "RDS instance class"
+  type        = string
+  default     = "db.t3.micro"
+}
+
+variable "db_allocated_storage" {
+  description = "Allocated storage for RDS instance (GB)"
+  type        = number
+  default     = 20
+}
+
+variable "enable_enhanced_monitoring" {
+  description = "Enable enhanced monitoring for RDS"
+  type        = bool
+  default     = true
+}
+
+variable "enable_performance_insights" {
+  description = "Enable Performance Insights for RDS"
+  type        = bool
+  default     = true
+}

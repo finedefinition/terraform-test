@@ -57,3 +57,34 @@ output "private_route_table_ids" {
   description = "List of IDs of the private route tables"
   value       = module.vpc.private_route_table_ids
 }
+
+output "web_security_group_id" {
+  description = "ID of the web security group"
+  value       = module.security.web_security_group_id
+}
+
+output "database_security_group_id" {
+  description = "ID of the database security group"
+  value       = module.security.database_security_group_id
+}
+
+output "ec2_instance_profile_name" {
+  description = "Name of the EC2 instance profile"
+  value       = module.security.ec2_instance_profile_name
+}
+
+# Database outputs
+output "db_instance_endpoint" {
+  description = "RDS instance endpoint"
+  value       = module.database.db_instance_endpoint
+}
+
+output "db_instance_port" {
+  description = "RDS instance port"
+  value       = module.database.db_instance_port
+}
+
+output "db_secret_name" {
+  description = "Name of the database secret in Secrets Manager"
+  value       = module.database.db_secret_name
+}
