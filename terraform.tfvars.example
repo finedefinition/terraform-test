@@ -1,0 +1,22 @@
+# Copy this file to terraform.tfvars and customize the values
+
+project_name = "my-project"
+environment  = "dev"
+aws_region   = "eu-central-1"
+
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["eu-central-1a", "eu-central-1b"]
+public_subnets     = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnets    = ["10.0.11.0/24", "10.0.12.0/24"]
+
+enable_nat_gateway = true
+enable_vpn_gateway = false
+
+# S3 bucket for application configs (nginx, docker-compose files)
+app_configs_bucket_name = "your-unique-app-configs-bucket"
+
+default_tags = {
+  Project     = "my-project"
+  Environment = "dev"
+  ManagedBy   = "terraform"
+}

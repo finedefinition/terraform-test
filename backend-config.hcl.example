@@ -1,0 +1,10 @@
+# Example backend configuration
+# Copy this file to backend-config.hcl and customize values
+# 
+# Using S3 native locking - no DynamoDB needed!
+
+bucket       = "your-terraform-state-bucket"
+key          = "vpc/terraform.tfstate"
+region       = "eu-central-1"
+encrypt      = true
+use_lockfile = true  # S3 native locking
