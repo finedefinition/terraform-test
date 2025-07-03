@@ -11,8 +11,8 @@ resource "aws_wafv2_web_acl" "main" {
     name     = "RateLimitRule"
     priority = 1
 
-    override_action {
-      none {}
+    action {
+      block {}
     }
 
     statement {
@@ -26,10 +26,6 @@ resource "aws_wafv2_web_acl" "main" {
       cloudwatch_metrics_enabled = true
       metric_name                = "RateLimitRule"
       sampled_requests_enabled   = true
-    }
-
-    action {
-      block {}
     }
   }
 

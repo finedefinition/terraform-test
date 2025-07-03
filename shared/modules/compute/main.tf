@@ -76,10 +76,11 @@ resource "aws_launch_template" "web" {
     name = var.ec2_instance_profile_name
   }
 
-  user_data = base64encode(templatefile("${path.root}/scripts/user_data.sh", {
+  user_data = base64encode(templatefile("${path.root}/../../scripts/user_data_s3.sh", {
     region           = var.aws_region
     project_name     = var.project_name
     db_secret_name   = var.db_secret_name
+    environment      = var.environment
   }))
 
   tag_specifications {

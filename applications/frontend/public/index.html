@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Project - Hello World</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .api-test { margin-top: 30px; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover { background-color: #0056b3; }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Hello World from CloudFront!</h1>
+        <p>This page is served from <strong>S3 + CloudFront</strong></p>
+        
+        <div class="api-test">
+            <h2>API Test</h2>
+            <p>Test backend API connections:</p>
+            <button onclick="testHealth()">Test Health Check</button>
+            <button onclick="testAPI()">Test API Endpoint</button>
+            <button onclick="testDatabase()">Test Database</button>
+            <div id="result"></div>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <h2>Infrastructure Info</h2>
+            <p><strong>Frontend:</strong> Static files from S3</p>
+            <p><strong>Backend:</strong> Docker containers on EC2</p>
+            <p><strong>Database:</strong> PostgreSQL RDS</p>
+            <p><strong>CDN:</strong> CloudFront with WAF protection</p>
+        </div>
+    </div>
+
+    <script>
+        function showResult(message, isSuccess) {
+            const result = document.getElementById('result');
+            result.innerHTML = message;
+            result.className = 'result ' + (isSuccess ? 'success' : 'error');
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.text();
+                showResult(`Health Check: ${data}`, response.ok);
+            } catch (error) {
+                showResult(`Health Check Error: ${error.message}`, false);
+            }
+        }
+
+        async function testAPI() {
+            try {
+                const response = await fetch('/api/hello');
+                const data = await response.json();
+                showResult(`API Response: ${JSON.stringify(data, null, 2)}`, response.ok);
+            } catch (error) {
+                showResult(`API Error: ${error.message}`, false);
+            }
+        }
+
+        async function testDatabase() {
+            try {
+                const response = await fetch('/api/db-test');
+                const data = await response.json();
+                showResult(`Database Test: ${JSON.stringify(data, null, 2)}`, response.ok);
+            } catch (error) {
+                showResult(`Database Error: ${error.message}`, false);
+            }
+        }
+    </script>
+</body>
+</html>

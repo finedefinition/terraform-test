@@ -12,6 +12,7 @@ variable "project_name" {
 variable "environment" {
   description = "Environment (dev, staging, prod)"
   type        = string
+  default     = "dev"
 }
 
 variable "vpc_cidr" {
@@ -53,7 +54,10 @@ variable "enable_vpn_gateway" {
 variable "default_tags" {
   description = "Default tags to apply to all resources"
   type        = map(string)
-  default     = {}
+  default = {
+    Environment = "dev"
+    ManagedBy   = "terraform"
+  }
 }
 
 variable "admin_cidr" {
@@ -69,28 +73,17 @@ variable "admin_cidr" {
   }
 }
 
+# Database variables
 variable "db_instance_class" {
   description = "RDS instance class"
   type        = string
-  default     = "db.t3.micro"
+  default     = "db.t3.micro"  # Suitable for dev
 }
 
 variable "db_allocated_storage" {
   description = "Allocated storage for RDS instance (GB)"
   type        = number
   default     = 20
-}
-
-variable "enable_enhanced_monitoring" {
-  description = "Enable enhanced monitoring for RDS"
-  type        = bool
-  default     = true
-}
-
-variable "enable_performance_insights" {
-  description = "Enable Performance Insights for RDS"
-  type        = bool
-  default     = true
 }
 
 variable "db_max_allocated_storage" {
@@ -117,6 +110,19 @@ variable "db_username" {
   default     = "dbadmin"
 }
 
+variable "enable_enhanced_monitoring" {
+  description = "Enable enhanced monitoring for RDS"
+  type        = bool
+  default     = false  # Disabled for dev to save costs
+}
+
+variable "enable_performance_insights" {
+  description = "Enable Performance Insights for RDS"
+  type        = bool
+  default     = false  # Disabled for dev to save costs
+}
+
+# Compute variables
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
@@ -138,11 +144,11 @@ variable "min_size" {
 variable "max_size" {
   description = "Maximum number of instances in ASG"
   type        = number
-  default     = 3
+  default     = 2  # Lower for dev
 }
 
 variable "desired_capacity" {
   description = "Desired number of instances in ASG"
   type        = number
-  default     = 2
+  default     = 1  # Single instance for dev
 }

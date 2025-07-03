@@ -59,29 +59,26 @@ DB_NAME=$(echo $DB_SECRET | jq -r '.dbname')
 DB_USER=$(echo $DB_SECRET | jq -r '.username')
 DB_PASSWORD=$(echo $DB_SECRET | jq -r '.password')
 
-# Export environment variables
-cat > /opt/app/.env <<EOF
-# Database Configuration
-DB_HOST=$DB_HOST
-DB_PORT=$DB_PORT
-DB_NAME=$DB_NAME
-DB_USER=$DB_USER
-DB_PASSWORD=$DB_PASSWORD
-DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME
+# Set secure umask for file creation
+umask 077
 
-# Application Configuration
-NODE_ENV=production
-PORT=3000
+# Export minimal environment variables (no secrets)
+cat > /opt/app/.env <<EOF
+# Application Configuration (NO SECRETS)
 AWS_REGION=${region}
 DB_SECRET_NAME=${db_secret_name}
 PROJECT_NAME=${project_name}
+ENVIRONMENT=production
 EOF
 
-# Create sample application structure
-echo "$(date): Creating sample application structure"
+# Set secure permissions
+chmod 600 /opt/app/.env
 
-# Frontend directory with sample React app
-mkdir -p frontend/public frontend/src
+# Deploy application code from S3 or Git
+echo "$(date): Deploying application code"
+
+# Create application directories
+mkdir -p frontend/public backend
 cat > frontend/package.json <<EOF
 {
   "name": "${project_name}-frontend",
@@ -139,126 +136,363 @@ cat > frontend/public/index.html <<EOF
 </html>
 EOF
 
-# Backend directory with sample Node.js app
+# Backend directory with Python Flask app
 mkdir -p backend
-cat > backend/package.json <<EOF
-{
-  "name": "${project_name}-backend",
-  "version": "1.0.0",
-  "main": "server.js",
-  "dependencies": {
-    "express": "^4.18.2",
-    "pg": "^8.8.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.0.3"
-  },
-  "scripts": {
-    "start": "node server.js",
-    "migrate": "node migrate.js"
-  }
-}
+cat > backend/requirements.txt <<EOF
+Flask==2.3.3
+psycopg2-binary==2.9.7
+boto3==1.28.85
+gunicorn==21.2.0
 EOF
 
-cat > backend/server.js <<EOF
-const express = require('express');
-const cors = require('cors');
-const { Pool } = require('pg');
-require('dotenv').config();
+cat > backend/app.py <<EOF
+from flask import Flask, jsonify, request
+import psycopg2
+import psycopg2.extras
+import os
+import json
+import boto3
+import re
+from botocore.exceptions import ClientError
 
-const app = express();
-const port = process.env.PORT || 3000;
+app = Flask(__name__)
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+# Input validation patterns
+EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+NAME_PATTERN = re.compile(r'^[a-zA-Z\s\-\']{1,100}$')
 
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
+def validate_email(email):
+    """Validate email format"""
+    return EMAIL_PATTERN.match(email) is not None
 
-// Health check endpoint
-app.get('/api/health', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT NOW() as timestamp');
-    res.json({
-      status: 'healthy',
-      database: 'connected',
-      timestamp: result.rows[0].timestamp,
-      instance_id: process.env.HOSTNAME || 'unknown'
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'unhealthy',
-      database: 'disconnected',
-      error: error.message
-    });
-  }
-});
+def validate_name(name):
+    """Validate name format"""
+    return NAME_PATTERN.match(name) is not None
 
-// Sample API endpoint
-app.get('/api/users', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM users LIMIT 10');
-    res.json(result.rows);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+def sanitize_input(value, max_length=255):
+    """Sanitize string input"""
+    if not isinstance(value, str):
+        return None
+    return value.strip()[:max_length]
 
-app.listen(port, () => {
-  console.log('${project_name} backend listening on port ' + port);
-});
+def get_db_credentials():
+    """Get database credentials from AWS Secrets Manager"""
+    secret_name = os.environ.get('DB_SECRET_NAME', '${db_secret_name}')
+    region_name = os.environ.get('AWS_REGION', '${region}')
+    
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+    
+    try:
+        response = client.get_secret_value(SecretId=secret_name)
+        secret = json.loads(response['SecretString'])
+        return secret
+    except ClientError as e:
+        print(f"Error retrieving secret: {e}")
+        return None
+
+def get_db_connection():
+    """Create database connection"""
+    credentials = get_db_credentials()
+    if not credentials:
+        return None
+    
+    try:
+        conn = psycopg2.connect(
+            host=credentials['host'],
+            port=credentials['port'],
+            database=credentials['dbname'],
+            user=credentials['username'],
+            password=credentials['password']
+        )
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for ALB"""
+    return "OK", 200
+
+@app.route('/api/hello', methods=['GET'])
+def hello_world():
+    """Simple API endpoint"""
+    return jsonify({
+        'message': 'Hello World from Backend!',
+        'status': 'success',
+        'service': 'backend-api',
+        'version': '1.0.0'
+    })
+
+@app.route('/api/db-test', methods=['GET'])
+def database_test():
+    """Test database connection and show table info"""
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({
+            'error': 'Could not connect to database',
+            'status': 'error'
+        }), 500
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Test connection and get database info
+        cursor.execute("SELECT version();")
+        db_version = cursor.fetchone()[0]
+        
+        # Check if users table exists
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables 
+            WHERE table_name = 'users'
+        """)
+        table_exists = cursor.fetchone()[0] > 0
+        
+        if table_exists:
+            cursor.execute("SELECT COUNT(*) FROM users")
+            user_count = cursor.fetchone()[0]
+        else:
+            user_count = 0
+        
+        return jsonify({
+            'status': 'success',
+            'database_version': db_version,
+            'users_table_exists': table_exists,
+            'user_count': user_count,
+            'message': 'Database connection successful'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/users', methods=['GET'])
+def get_users():
+    """Get all users with pagination and filtering"""
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    try:
+        # Get query parameters with validation
+        limit = min(int(request.args.get('limit', 10)), 100)  # Max 100 items
+        offset = max(int(request.args.get('offset', 0)), 0)
+        
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Use parameterized query to prevent SQL injection
+        cursor.execute("""
+            SELECT id, name, email, created_at 
+            FROM users 
+            ORDER BY created_at DESC 
+            LIMIT %s OFFSET %s
+        """, (limit, offset))
+        
+        users = cursor.fetchall()
+        
+        # Get total count
+        cursor.execute("SELECT COUNT(*) FROM users")
+        total_count = cursor.fetchone()['count']
+        
+        return jsonify({
+            'users': [dict(user) for user in users],
+            'count': len(users),
+            'total': total_count,
+            'limit': limit,
+            'offset': offset
+        })
+        
+    except ValueError:
+        return jsonify({'error': 'Invalid pagination parameters'}), 400
+    except Exception as e:
+        return jsonify({'error': 'Database error occurred'}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/users', methods=['POST'])
+def create_user():
+    """Create a new user with validation"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        # Validate and sanitize input
+        name = sanitize_input(data.get('name'))
+        email = sanitize_input(data.get('email'))
+        
+        if not name or not validate_name(name):
+            return jsonify({'error': 'Invalid name format'}), 400
+        
+        if not email or not validate_email(email):
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'error': 'Database connection failed'}), 500
+        
+        try:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Use parameterized query to prevent SQL injection
+            cursor.execute("""
+                INSERT INTO users (name, email) 
+                VALUES (%s, %s) 
+                RETURNING id, name, email, created_at
+            """, (name, email))
+            
+            new_user = cursor.fetchone()
+            conn.commit()
+            
+            return jsonify({
+                'message': 'User created successfully',
+                'user': dict(new_user)
+            }), 201
+            
+        except psycopg2.IntegrityError:
+            conn.rollback()
+            return jsonify({'error': 'Email already exists'}), 409
+        except Exception as e:
+            conn.rollback()
+            return jsonify({'error': 'Database error occurred'}), 500
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        return jsonify({'error': 'Invalid request data'}), 400
+
+@app.route('/api/users/<int:user_id>', methods=['GET'])
+def get_user(user_id):
+    """Get a specific user by ID"""
+    if user_id <= 0:
+        return jsonify({'error': 'Invalid user ID'}), 400
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+    
+    try:
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Use parameterized query to prevent SQL injection
+        cursor.execute("""
+            SELECT id, name, email, created_at 
+            FROM users 
+            WHERE id = %s
+        """, (user_id,))
+        
+        user = cursor.fetchone()
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({'user': dict(user)})
+        
+    except Exception as e:
+        return jsonify({'error': 'Database error occurred'}), 500
+    finally:
+        conn.close()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=80, debug=False)
 EOF
 
-cat > backend/migrate.js <<EOF
-const { Pool } = require('pg');
-require('dotenv').config();
+cat > backend/migrate.py <<EOF
+#!/usr/bin/env python3
+import os
+import sys
+import json
+import boto3
+import psycopg2
+from botocore.exceptions import ClientError
 
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
+def get_db_credentials():
+    secret_name = os.environ.get('DB_SECRET_NAME', '${db_secret_name}')
+    region_name = os.environ.get('AWS_REGION', '${region}')
+    
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+    
+    try:
+        response = client.get_secret_value(SecretId=secret_name)
+        secret = json.loads(response['SecretString'])
+        return secret
+    except ClientError as e:
+        print(f"Error retrieving secret: {e}")
+        return None
 
-async function runMigrations() {
-  try {
-    console.log('Running database migrations...');
+def run_migrations():
+    credentials = get_db_credentials()
+    if not credentials:
+        print("Failed to get database credentials")
+        sys.exit(1)
     
-    // Create users table
-    await pool.query(\`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        email VARCHAR(100) UNIQUE NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    \`);
-    
-    // Insert sample data
-    await pool.query(\`
-      INSERT INTO users (name, email) VALUES 
-        ('John Doe', 'john@example.com'),
-        ('Jane Smith', 'jane@example.com')
-      ON CONFLICT (email) DO NOTHING
-    \`);
-    
-    console.log('Migrations completed successfully');
-    process.exit(0);
-  } catch (error) {
-    console.error('Migration failed:', error);
-    process.exit(1);
-  }
-}
+    try:
+        conn = psycopg2.connect(
+            host=credentials['host'],
+            port=credentials['port'],
+            database=credentials['dbname'],
+            user=credentials['username'],
+            password=credentials['password']
+        )
+        
+        cursor = conn.cursor()
+        
+        # Create users table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create indexes
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
+        ''')
+        
+        # Insert sample data
+        cursor.execute('''
+            INSERT INTO users (name, email) VALUES 
+                ('Alice Johnson', 'alice@example.com'),
+                ('Bob Smith', 'bob@example.com'),
+                ('Charlie Brown', 'charlie@example.com')
+            ON CONFLICT (email) DO NOTHING
+        ''')
+        
+        conn.commit()
+        print("Migrations completed successfully")
+        
+    except Exception as e:
+        print(f"Migration failed: {e}")
+        sys.exit(1)
+    finally:
+        if conn:
+            conn.close()
 
-runMigrations();
+if __name__ == "__main__":
+    run_migrations()
 EOF
+
+chmod +x backend/migrate.py
 
 # Copy Docker Compose and Nginx configs
 echo "$(date): Setting up Docker configuration"
@@ -284,6 +518,7 @@ services:
   frontend:
     image: node:18-alpine
     working_dir: /app
+    user: "1000:1000"
     environment:
       - NODE_ENV=production
       - REACT_APP_API_URL=/api
@@ -304,26 +539,39 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.npm
 
   backend:
-    image: node:18-alpine
+    image: python:3.11-slim
     working_dir: /app
+    user: "1000:1000"
     env_file:
       - /opt/app/.env
     volumes:
       - ./backend:/app
-      - /app/node_modules
     command: >
       sh -c "
-        npm install --production &&
-        npm run migrate &&
-        npm start
+        apt-get update && apt-get install -y gcc &&
+        pip install --no-cache-dir -r requirements.txt &&
+        python migrate.py &&
+        gunicorn --bind 0.0.0.0:80 --workers 2 --timeout 60 --user 1000 --group 1000 app:app
       "
     expose:
-      - "3000"
+      - "80"
     restart: unless-stopped
     networks:
       - app-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/log
 
 networks:
   app-network:
@@ -333,37 +581,82 @@ DOCKER_COMPOSE_EOF
 mkdir -p configs/nginx
 cat > configs/nginx/nginx.conf <<'NGINX_EOF'
 upstream backend {
-    server backend:3000;
+    server backend:80;
 }
 
 upstream frontend {
     server frontend:3000;
 }
 
+# Security headers for all responses
+add_header X-Frame-Options "SAMEORIGIN" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-XSS-Protection "1; mode=block" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';" always;
+
+# Rate limiting
+limit_req_zone \$binary_remote_addr zone=api:10m rate=10r/s;
+limit_req_zone \$binary_remote_addr zone=general:10m rate=100r/s;
+
 server {
     listen 80;
     server_name _;
+    
+    # Security headers
+    server_tokens off;
+    
+    # Rate limiting for API endpoints
+    location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        limit_req_status 429;
+        
+        proxy_pass http://backend;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        
+        # Additional security headers for API
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Pragma "no-cache" always;
+        add_header Expires "0" always;
+    }
 
     location /health {
         access_log off;
+        allow 10.0.0.0/8;  # Only allow internal health checks
+        deny all;
         return 200 '{"status":"healthy","timestamp":"now"}';
         add_header Content-Type application/json;
     }
 
-    location /api/ {
-        proxy_pass http://backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
     location / {
+        limit_req zone=general burst=200 nodelay;
+        
         proxy_pass http://frontend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        
+        # Cache static assets
+        location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)\$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+    
+    # Block common attack patterns
+    location ~* \.(php|asp|aspx|jsp)\$ {
+        deny all;
+        return 444;
+    }
+    
+    # Block access to sensitive files
+    location ~* /\.(ht|git|svn|env) {
+        deny all;
+        return 444;
     }
 }
 NGINX_EOF

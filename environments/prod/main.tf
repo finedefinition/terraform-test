@@ -1,5 +1,37 @@
+terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  backend "s3" {
+    # Configure with backend-config.hcl
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+  
+  default_tags {
+    tags = var.default_tags
+  }
+}
+
+# US East 1 provider for CloudFront WAF
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+  
+  default_tags {
+    tags = var.default_tags
+  }
+}
+
 module "vpc" {
-  source = "./modules/vpc"
+  source = "../../shared/modules/vpc"
 
   project_name       = var.project_name
   environment       = var.environment
@@ -13,7 +45,7 @@ module "vpc" {
 }
 
 module "security" {
-  source = "./modules/security"
+  source = "../../shared/modules/security"
 
   project_name           = var.project_name
   environment           = var.environment
@@ -24,7 +56,7 @@ module "security" {
 }
 
 module "database" {
-  source = "./modules/database"
+  source = "../../shared/modules/database"
 
   project_name               = var.project_name
   environment               = var.environment
@@ -45,7 +77,7 @@ module "database" {
 }
 
 module "compute" {
-  source = "./modules/compute"
+  source = "../../shared/modules/compute"
 
   project_name               = var.project_name
   environment               = var.environment
@@ -66,8 +98,21 @@ module "compute" {
   default_tags = var.default_tags
 }
 
+module "cloudfront" {
+  source = "../../shared/modules/cloudfront"
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  project_name   = var.project_name
+  alb_dns_name   = module.compute.alb_dns_name
+  default_tags   = var.default_tags
+}
+
+# Production-specific: VPC Endpoints for enhanced security
 module "vpc_endpoints" {
-  source = "./modules/vpc-endpoints"
+  source = "../../shared/modules/vpc-endpoints"
 
   project_name        = var.project_name
   aws_region         = var.aws_region
@@ -77,27 +122,16 @@ module "vpc_endpoints" {
   default_tags       = var.default_tags
 }
 
-# module "network_acl" {
-#   source = "./modules/network-acl"
+# Production-specific: Network ACL for additional security
+module "network_acl" {
+  source = "../../shared/modules/network-acl"
 
-#   project_name        = var.project_name
-#   environment        = var.environment
-#   vpc_id             = module.vpc.vpc_id
-#   vpc_cidr           = var.vpc_cidr
-#   public_subnet_ids  = module.vpc.public_subnets
-#   private_subnet_ids = module.vpc.private_subnets
-#   admin_cidr         = var.admin_cidr
-#   default_tags       = var.default_tags
-# }
-
-module "cloudfront" {
-  source = "./modules/cloudfront"
-
-  providers = {
-    aws.us_east_1 = aws.us_east_1
-  }
-
-  project_name   = var.project_name
-  alb_dns_name   = module.compute.alb_dns_name
-  default_tags   = var.default_tags
+  project_name        = var.project_name
+  environment        = var.environment
+  vpc_id             = module.vpc.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  public_subnet_ids  = module.vpc.public_subnets
+  private_subnet_ids = module.vpc.private_subnets
+  admin_cidr         = var.admin_cidr
+  default_tags       = var.default_tags
 }
