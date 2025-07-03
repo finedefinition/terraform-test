@@ -45,7 +45,8 @@ terraform-test/
 │       ├── s3-apps/            # S3 buckets for applications
 │       └── cloudfront/         # CloudFront CDN
 ├── applications/
-│   └── backend/                # Flask backend application
+│   ├── backend/                # Flask backend application
+│   └── frontend/               # Frontend static files
 └── configs/
     ├── docker-compose.yml      # Docker configuration
     └── nginx.conf              # Nginx configuration
