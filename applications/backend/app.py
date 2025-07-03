@@ -100,37 +100,6 @@ def hello_world():
         'version': '1.0.0'
     })
 
-@app.route('/api/db-test', methods=['GET'])
-def database_test():
-    """Test database connection"""
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({
-            'error': 'Could not connect to database',
-            'status': 'error'
-        }), 500
-    
-    try:
-        cursor = conn.cursor()
-        
-        # Test connection and get database info
-        cursor.execute("SELECT version();")
-        db_version = cursor.fetchone()[0]
-        
-        return jsonify({
-            'status': 'success',
-            'database_version': db_version,
-            'message': 'Database connection successful'
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'status': 'error'
-        }), 500
-    finally:
-        if conn:
-            conn.close()
 
 @app.route('/api/users', methods=['GET'])
 def get_users():

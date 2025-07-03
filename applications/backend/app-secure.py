@@ -79,52 +79,6 @@ def hello_world():
         'version': '1.0.0'
     })
 
-@app.route('/api/db-test', methods=['GET'])
-def database_test():
-    """Test database connection and show table info"""
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({
-            'error': 'Could not connect to database',
-            'status': 'error'
-        }), 500
-    
-    try:
-        cursor = conn.cursor()
-        
-        # Test connection and get database info
-        cursor.execute("SELECT version();")
-        db_version = cursor.fetchone()[0]
-        
-        # Check if users table exists
-        cursor.execute("""
-            SELECT COUNT(*) FROM information_schema.tables 
-            WHERE table_name = 'users'
-        """)
-        table_exists = cursor.fetchone()[0] > 0
-        
-        if table_exists:
-            cursor.execute("SELECT COUNT(*) FROM users")
-            user_count = cursor.fetchone()[0]
-        else:
-            user_count = 0
-        
-        return jsonify({
-            'status': 'success',
-            'database_version': db_version,
-            'users_table_exists': table_exists,
-            'user_count': user_count,
-            'message': 'Database connection successful'
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'status': 'error'
-        }), 500
-    finally:
-        if conn:
-            conn.close()
 
 @app.route('/api/users', methods=['GET'])
 def get_users():

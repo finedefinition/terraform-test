@@ -23,6 +23,11 @@ output "database_security_group_id" {
   value       = module.security.database_security_group_id
 }
 
+output "ec2_rds_security_group_id" {
+  description = "ID of the EC2 to RDS security group"
+  value       = module.security.ec2_rds_security_group_id
+}
+
 output "db_instance_endpoint" {
   description = "RDS instance endpoint"
   value       = module.database.db_instance_endpoint

@@ -43,12 +43,11 @@ services:
   backend:
     image: python:3.11-slim
     working_dir: /app
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=8080
-      - DB_SECRET_NAME=${DB_SECRET_NAME}
-      - AWS_REGION=${AWS_REGION}
-      - AWS_DEFAULT_REGION=${AWS_REGION}
       - AWS_METADATA_SERVICE_TIMEOUT=5
       - AWS_METADATA_SERVICE_NUM_ATTEMPTS=3
     volumes:

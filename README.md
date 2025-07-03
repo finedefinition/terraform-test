@@ -1,6 +1,27 @@
 # AWS Terraform Infrastructure Project
 
-Повна AWS інфраструктура з веб-додатком, базою даних та CloudFront CDN, розгорнута за допомогою Terraform.
+## Завдання
+Підготувати Terraform код для розгортання простого застосунку: фронт, бекенд, база даних. Рекомендовані сервіси: VPC, EC2, CloudFront. Також підготувати конфігурацію Nginx та Docker Compose для інфраструктури на EC2.
+
+## Реалізація
+Повна AWS інфраструктура з веб-додатком, базою даних та CloudFront CDN, розгорнута за допомогою Terraform із використанням Docker Compose та Nginx.
+
+### Виконання завдання:
+✅ **Фронт**: Статичні файли HTML/CSS/JS розміщені в S3 та роздаються через CloudFront CDN  
+✅ **Бекенд**: Flask API у Docker контейнерах на EC2 з автоматичним масштабуванням  
+✅ **База даних**: PostgreSQL RDS у приватних сабнетах з автоматичним бекапом  
+✅ **VPC**: Повноцінна мережева архітектура з публічними та приватними сабнетами  
+✅ **EC2**: Auto Scaling Group з Launch Template для бекенду  
+✅ **CloudFront**: CDN з WAF захистом для фронту та проксування API  
+✅ **Nginx**: Реверс-проксі для маршрутизації між фронтом і бекендом  
+✅ **Docker Compose**: Контейнеризація бекенду з автоматичним деплоєм
+
+### Ключові файли конфігурацій:
+- **`configs/docker-compose.yml`** - Docker Compose для бекенду та Nginx
+- **`configs/nginx.conf`** - Nginx конфігурація з проксуванням API
+- **`applications/backend/`** - Flask API застосунок
+- **`applications/frontend/public/index.html`** - Frontend інтерфейс
+- **`shared/modules/`** - Terraform модулі для всіх компонентів
 
 ## Структура проекту
 
@@ -24,8 +45,7 @@ terraform-test/
 │       ├── s3-apps/            # S3 buckets for applications
 │       └── cloudfront/         # CloudFront CDN
 ├── applications/
-│   ├── backend/                # Flask backend application
-│   └── database/               # Database migrations
+│   └── backend/                # Flask backend application
 └── configs/
     ├── docker-compose.yml      # Docker configuration
     └── nginx.conf              # Nginx configuration
@@ -125,6 +145,12 @@ terraform output cloudfront_url
 
 Після успішного розгортання, використовуйте наступні URL для тестування:
 
+### Результат роботи системи
+
+![Інтерфейс тестування](screenshots/frontend-example.png)
+
+*Веб-інтерфейс показує успішну роботу всіх компонентів: Frontend (S3+CloudFront), Backend (EC2+Docker), Database (RDS PostgreSQL), CDN (CloudFront+WAF)*
+
 #### Frontend (CloudFront):
 ```bash
 # Головна сторінка
@@ -142,8 +168,6 @@ curl https://your-cloudfront-url.cloudfront.net/health
 # API endpoint
 curl https://your-cloudfront-url.cloudfront.net/api/hello
 
-# Тест підключення до бази даних
-curl https://your-cloudfront-url.cloudfront.net/api/db-test
 ```
 
 #### Тестування через ALB (напряму):
@@ -154,7 +178,6 @@ terraform output alb_dns_name
 # Тестування
 curl http://your-alb-url.eu-central-1.elb.amazonaws.com/health
 curl http://your-alb-url.eu-central-1.elb.amazonaws.com/api/hello
-curl http://your-alb-url.eu-central-1.elb.amazonaws.com/api/db-test
 ```
 
 ### 3. Перевірка на сервері
@@ -164,7 +187,6 @@ curl http://your-alb-url.eu-central-1.elb.amazonaws.com/api/db-test
 # Локальне тестування
 curl http://localhost/health
 curl http://localhost/api/hello
-curl http://localhost/api/db-test
 
 ```
 

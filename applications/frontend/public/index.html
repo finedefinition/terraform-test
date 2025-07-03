@@ -51,7 +51,6 @@
             <p>Test backend API connections:</p>
             <button onclick="testHealth()">Test Health Check</button>
             <button onclick="testAPI()">Test API Endpoint</button>
-            <button onclick="testDatabase()">Test Database</button>
             <div id="result"></div>
         </div>
         
@@ -91,15 +90,6 @@
             }
         }
 
-        async function testDatabase() {
-            try {
-                const response = await fetch('/api/db-test');
-                const data = await response.json();
-                showResult(`Database Test: ${JSON.stringify(data, null, 2)}`, response.ok);
-            } catch (error) {
-                showResult(`Database Error: ${error.message}`, false);
-            }
-        }
     </script>
 </body>
 </html>

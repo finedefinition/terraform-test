@@ -40,7 +40,7 @@ cd /home/ec2-user/app
 
 # Create minimal .env file (no secrets)
 cat > .env <<EOF
-AWS_REGION=${region}
+AWS_DEFAULT_REGION=${region}
 DB_SECRET_NAME=${db_secret_name}
 PROJECT_NAME=${project_name}
 ENVIRONMENT=production
