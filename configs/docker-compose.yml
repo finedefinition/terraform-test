@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./configs/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Frontend Application (React/Vue/Angular)
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: >
+      sh -c "
+        if [ ! -d node_modules ]; then
+          npm install --production
+        fi &&
+        if [ -f package.json ] && grep -q 'build' package.json; then
+          npm run build &&
+          npx serve -s build -l 3000
+        else
+          echo 'Frontend build not configured, serving static files' &&
+          python3 -m http.server 3000
+        fi
+      "
+    expose:
+      - "3000"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Backend Application (Node.js/Python/Go)
+  backend:
+    image: node:18-alpine
+    working_dir: /app
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL_SECRET_NAME=${DB_SECRET_NAME}
+      - AWS_REGION=${AWS_REGION}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: >
+      sh -c "
+        if [ ! -d node_modules ]; then
+          npm install --production
+        fi &&
+        
+        # Run database migrations if script exists
+        if [ -f package.json ] && grep -q 'migrate' package.json; then
+          echo 'Running database migrations...' &&
+          npm run migrate
+        fi &&
+        
+        # Start the application
+        if [ -f package.json ] && grep -q 'start' package.json; then
+          npm start
+        else
+          echo 'No start script found, using default node server' &&
+          node server.js || node index.js || node app.js
+        fi
+      "
+    expose:
+      - "3000"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Database Admin Tool (optional)
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=database
+    restart: unless-stopped
+    networks:
+      - app-network
+    profiles:
+      - admin
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  node_modules_frontend:
+  node_modules_backend:

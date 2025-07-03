@@ -55,7 +55,6 @@ variable "db_max_allocated_storage" {
   default     = 100
 }
 
-# Monitoring and performance
 variable "enable_enhanced_monitoring" {
   description = "Enable enhanced monitoring for RDS"
   type        = bool

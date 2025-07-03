@@ -92,7 +92,7 @@ resource "aws_iam_role" "ec2_role" {
 
 resource "aws_iam_policy" "ec2_s3_policy" {
   name        = "${var.project_name}-ec2-s3-policy"
-  description = "Policy for EC2 to access S3 configs and CloudWatch logs"
+  description = "Policy for EC2 to access S3, CloudWatch, SSM and Secrets Manager"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -104,8 +104,8 @@ resource "aws_iam_policy" "ec2_s3_policy" {
           "s3:ListBucket"
         ]
         Resource = [
-          "arn:aws:s3:::*",
-          "arn:aws:s3:::*/*"
+          "arn:aws:s3:::${var.project_name}-${var.environment}-*",
+          "arn:aws:s3:::${var.project_name}-${var.environment}-*/*"
         ]
       },
       {
@@ -117,6 +117,50 @@ resource "aws_iam_policy" "ec2_s3_policy" {
           "logs:DescribeLogStreams"
         ]
         Resource = "arn:aws:logs:${var.aws_region}:*:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:UpdateInstanceInformation",
+          "ssm:SendCommand",
+          "ssm:ListCommands",
+          "ssm:ListCommandInvocations",
+          "ssm:DescribeInstanceInformation",
+          "ssm:GetParameters",
+          "ssm:GetParameter",
+          "ssm:PutParameter"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2messages:AcknowledgeMessage",
+          "ec2messages:DeleteMessage",
+          "ec2messages:FailMessage",
+          "ec2messages:GetEndpoint",
+          "ec2messages:GetMessages",
+          "ec2messages:SendReply"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
+        ]
+        Resource = "*"
       }
     ]
   })

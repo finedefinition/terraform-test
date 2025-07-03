@@ -88,3 +88,29 @@ output "db_secret_name" {
   description = "Name of the database secret in Secrets Manager"
   value       = module.database.db_secret_name
 }
+
+output "alb_dns_name" {
+  description = "DNS name of the load balancer"
+  value       = module.compute.alb_dns_name
+}
+
+output "alb_zone_id" {
+  description = "Zone ID of the load balancer"
+  value       = module.compute.alb_zone_id
+}
+
+output "asg_name" {
+  description = "Name of the Auto Scaling Group"
+  value       = module.compute.asg_name
+}
+
+# CloudFront outputs
+output "cloudfront_domain_name" {
+  description = "Domain name of the CloudFront distribution"
+  value       = module.cloudfront.cloudfront_domain_name
+}
+
+output "frontend_bucket_name" {
+  description = "Name of the S3 bucket for frontend assets"
+  value       = module.cloudfront.frontend_bucket_name
+}

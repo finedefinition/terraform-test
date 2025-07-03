@@ -8,10 +8,14 @@ variable "vpc_id" {
   type        = string
 }
 
+variable "environment" {
+  description = "Environment (dev, staging, prod)"
+  type        = string
+}
+
 variable "admin_cidr" {
   description = "CIDR block for admin SSH access"
   type        = string
-  default     = "0.0.0.0/0"  # Ограничить в production!
 }
 
 variable "aws_region" {

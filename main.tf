@@ -2,6 +2,7 @@ module "vpc" {
   source = "./modules/vpc"
 
   project_name       = var.project_name
+  environment       = var.environment
   vpc_cidr          = var.vpc_cidr
   availability_zones = var.availability_zones
   public_subnets    = var.public_subnets
@@ -15,6 +16,7 @@ module "security" {
   source = "./modules/security"
 
   project_name           = var.project_name
+  environment           = var.environment
   vpc_id                = module.vpc.vpc_id
   admin_cidr            = var.admin_cidr
   aws_region            = var.aws_region
@@ -30,10 +32,72 @@ module "database" {
   database_security_group_id = module.security.database_security_group_id
   
   # Database configuration
+  db_name                   = var.db_name
+  db_username               = var.db_username
   db_instance_class         = var.db_instance_class
+  db_engine_version         = var.db_engine_version
   db_allocated_storage      = var.db_allocated_storage
+  db_max_allocated_storage  = var.db_max_allocated_storage
   enable_enhanced_monitoring = var.enable_enhanced_monitoring
   enable_performance_insights = var.enable_performance_insights
   
   default_tags = var.default_tags
+}
+
+module "compute" {
+  source = "./modules/compute"
+
+  project_name               = var.project_name
+  environment               = var.environment
+  aws_region                = var.aws_region
+  vpc_id                    = module.vpc.vpc_id
+  public_subnet_ids         = module.vpc.public_subnets
+  private_subnet_ids        = module.vpc.private_subnets
+  web_security_group_id     = module.security.web_security_group_id
+  ec2_instance_profile_name = module.security.ec2_instance_profile_name
+  db_secret_name           = module.database.db_secret_name
+
+  instance_type     = var.instance_type
+  key_pair_name     = var.key_pair_name
+  min_size         = var.min_size
+  max_size         = var.max_size
+  desired_capacity = var.desired_capacity
+  
+  default_tags = var.default_tags
+}
+
+module "vpc_endpoints" {
+  source = "./modules/vpc-endpoints"
+
+  project_name        = var.project_name
+  aws_region         = var.aws_region
+  vpc_id             = module.vpc.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = module.vpc.private_subnets
+  default_tags       = var.default_tags
+}
+
+# module "network_acl" {
+#   source = "./modules/network-acl"
+
+#   project_name        = var.project_name
+#   environment        = var.environment
+#   vpc_id             = module.vpc.vpc_id
+#   vpc_cidr           = var.vpc_cidr
+#   public_subnet_ids  = module.vpc.public_subnets
+#   private_subnet_ids = module.vpc.private_subnets
+#   admin_cidr         = var.admin_cidr
+#   default_tags       = var.default_tags
+# }
+
+module "cloudfront" {
+  source = "./modules/cloudfront"
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  project_name   = var.project_name
+  alb_dns_name   = module.compute.alb_dns_name
+  default_tags   = var.default_tags
 }

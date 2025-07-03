@@ -15,3 +15,13 @@ provider "aws" {
     tags = var.default_tags
   }
 }
+
+# US East 1 provider for CloudFront WAF
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+  
+  default_tags {
+    tags = var.default_tags
+  }
+}

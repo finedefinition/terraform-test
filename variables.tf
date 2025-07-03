@@ -56,18 +56,19 @@ variable "default_tags" {
   default     = {}
 }
 
-variable "app_configs_bucket_name" {
-  description = "Name of S3 bucket for application configs"
-  type        = string
-}
-
 variable "admin_cidr" {
-  description = "CIDR block for admin SSH access"
+  description = "CIDR block for admin SSH access (required - set to your IP/32 for security)"
   type        = string
-  default     = "0.0.0.0/0"  # Ограничить в production!
+  validation {
+    condition = can(cidrhost(var.admin_cidr, 0))
+    error_message = "admin_cidr must be a valid CIDR block."
+  }
+  validation {
+    condition = !startswith(var.admin_cidr, "0.0.0.0/0")
+    error_message = "admin_cidr cannot be 0.0.0.0/0 for security reasons. Use your specific IP range."
+  }
 }
 
-# Database variables
 variable "db_instance_class" {
   description = "RDS instance class"
   type        = string
@@ -90,4 +91,58 @@ variable "enable_performance_insights" {
   description = "Enable Performance Insights for RDS"
   type        = bool
   default     = true
+}
+
+variable "db_max_allocated_storage" {
+  description = "Maximum allocated storage for RDS instance (GB)"
+  type        = number
+  default     = 100
+}
+
+variable "db_engine_version" {
+  description = "PostgreSQL engine version"
+  type        = string
+  default     = "15.4"
+}
+
+variable "db_name" {
+  description = "Database name"
+  type        = string
+  default     = "appdb"
+}
+
+variable "db_username" {
+  description = "Database master username"
+  type        = string
+  default     = "dbadmin"
+}
+
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "key_pair_name" {
+  description = "Name of the EC2 Key Pair (optional)"
+  type        = string
+  default     = ""
+}
+
+variable "min_size" {
+  description = "Minimum number of instances in ASG"
+  type        = number
+  default     = 1
+}
+
+variable "max_size" {
+  description = "Maximum number of instances in ASG"
+  type        = number
+  default     = 3
+}
+
+variable "desired_capacity" {
+  description = "Desired number of instances in ASG"
+  type        = number
+  default     = 2
 }
