@@ -8,6 +8,11 @@ output "database_security_group_id" {
   value       = aws_security_group.database.id
 }
 
+output "ec2_rds_security_group_id" {
+  description = "ID of the EC2 to RDS security group"
+  value       = aws_security_group.ec2_rds.id
+}
+
 output "ec2_role_arn" {
   description = "ARN of the EC2 IAM role"
   value       = aws_iam_role.ec2_role.arn

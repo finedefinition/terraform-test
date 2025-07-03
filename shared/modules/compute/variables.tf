@@ -33,6 +33,11 @@ variable "web_security_group_id" {
   type        = string
 }
 
+variable "ec2_rds_security_group_id" {
+  description = "Security group ID for EC2 to RDS connectivity"
+  type        = string
+}
+
 variable "ec2_instance_profile_name" {
   description = "Name of the EC2 instance profile"
   type        = string

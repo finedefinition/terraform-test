@@ -71,8 +71,9 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids = [var.database_security_group_id]
   db_subnet_group_name   = aws_db_subnet_group.main.name
   publicly_accessible    = false
+  availability_zone      = null
 
-  multi_az = var.environment == "production" ? true : false
+  multi_az = true
 
   backup_retention_period = var.environment == "production" ? 7 : 1
   backup_window          = "03:00-04:00"
@@ -89,6 +90,7 @@ resource "aws_db_instance" "main" {
   performance_insights_retention_period = var.enable_performance_insights ? 7 : null
 
   auto_minor_version_upgrade = true
+  iam_database_authentication_enabled = true
 
   tags = merge(var.default_tags, {
     Name = "${var.project_name}-postgres-db"

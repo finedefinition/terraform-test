@@ -45,19 +45,35 @@ resource "aws_security_group" "web" {
   })
 }
 
+# EC2 to RDS security group (allows outbound to database)
+resource "aws_security_group" "ec2_rds" {
+  name_prefix = "${var.project_name}-ec2-rds-"
+  vpc_id      = var.vpc_id
+  description = "Security group for EC2 to RDS connectivity"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = merge(var.default_tags, {
+    Name = "${var.project_name}-ec2-rds-sg"
+    Type = "EC2toRDS"
+  })
+}
+
+# Database security group (allows inbound from EC2)
 resource "aws_security_group" "database" {
   name_prefix = "${var.project_name}-db-"
   vpc_id      = var.vpc_id
   description = "Security group for PostgreSQL database"
 
-  ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.web.id]
-    description     = "PostgreSQL from web servers"
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
   }
-
 
   lifecycle {
     create_before_destroy = true
@@ -67,6 +83,28 @@ resource "aws_security_group" "database" {
     Name = "${var.project_name}-db-sg"
     Type = "Database"
   })
+}
+
+# EC2 to RDS egress rule
+resource "aws_security_group_rule" "ec2_rds_egress" {
+  type                     = "egress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.database.id
+  security_group_id        = aws_security_group.ec2_rds.id
+  description              = "PostgreSQL to database security group"
+}
+
+# Database ingress rule from EC2
+resource "aws_security_group_rule" "db_ingress_from_ec2_rds" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.ec2_rds.id
+  security_group_id        = aws_security_group.database.id
+  description              = "PostgreSQL from EC2 RDS security group"
 }
 
 resource "aws_iam_role" "ec2_role" {
@@ -137,6 +175,24 @@ resource "aws_iam_policy" "ec2_s3_policy" {
         Action = [
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "rds-db:connect"
+        ]
+        Resource = [
+          "arn:aws:rds-db:${var.aws_region}:*:dbuser:${var.project_name}-db/*",
+          "arn:aws:rds-db:${var.aws_region}:*:dbuser:*/${var.project_name}-*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "rds:DescribeDBInstances",
+          "rds:DescribeDBClusters"
         ]
         Resource = "*"
       },

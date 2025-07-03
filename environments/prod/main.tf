@@ -62,8 +62,7 @@ module "database" {
   environment               = var.environment
   private_subnet_ids        = module.vpc.private_subnets
   database_security_group_id = module.security.database_security_group_id
-  
-  # Database configuration
+
   db_name                   = var.db_name
   db_username               = var.db_username
   db_instance_class         = var.db_instance_class
@@ -76,18 +75,27 @@ module "database" {
   default_tags = var.default_tags
 }
 
+module "s3_apps" {
+  source = "../../shared/modules/s3-apps"
+
+  project_name = var.project_name
+  environment  = var.environment
+  default_tags = var.default_tags
+}
+
 module "compute" {
   source = "../../shared/modules/compute"
 
-  project_name               = var.project_name
-  environment               = var.environment
-  aws_region                = var.aws_region
-  vpc_id                    = module.vpc.vpc_id
-  public_subnet_ids         = module.vpc.public_subnets
-  private_subnet_ids        = module.vpc.private_subnets
-  web_security_group_id     = module.security.web_security_group_id
-  ec2_instance_profile_name = module.security.ec2_instance_profile_name
-  db_secret_name           = module.database.db_secret_name
+  project_name                = var.project_name
+  environment                = var.environment
+  aws_region                 = var.aws_region
+  vpc_id                     = module.vpc.vpc_id
+  public_subnet_ids          = module.vpc.public_subnets
+  private_subnet_ids         = module.vpc.private_subnets
+  web_security_group_id      = module.security.web_security_group_id
+  ec2_rds_security_group_id  = module.security.ec2_rds_security_group_id
+  ec2_instance_profile_name  = module.security.ec2_instance_profile_name
+  db_secret_name            = module.database.db_secret_name
 
   instance_type     = var.instance_type
   key_pair_name     = var.key_pair_name
@@ -110,19 +118,6 @@ module "cloudfront" {
   default_tags   = var.default_tags
 }
 
-# Production-specific: VPC Endpoints for enhanced security
-module "vpc_endpoints" {
-  source = "../../shared/modules/vpc-endpoints"
-
-  project_name        = var.project_name
-  aws_region         = var.aws_region
-  vpc_id             = module.vpc.vpc_id
-  vpc_cidr           = var.vpc_cidr
-  private_subnet_ids = module.vpc.private_subnets
-  default_tags       = var.default_tags
-}
-
-# Production-specific: Network ACL for additional security
 module "network_acl" {
   source = "../../shared/modules/network-acl"
 

@@ -62,8 +62,7 @@ module "database" {
   environment               = var.environment
   private_subnet_ids        = module.vpc.private_subnets
   database_security_group_id = module.security.database_security_group_id
-  
-  # Database configuration
+
   db_name                   = var.db_name
   db_username               = var.db_username
   db_instance_class         = var.db_instance_class
@@ -79,15 +78,16 @@ module "database" {
 module "compute" {
   source = "../../shared/modules/compute"
 
-  project_name               = var.project_name
-  environment               = var.environment
-  aws_region                = var.aws_region
-  vpc_id                    = module.vpc.vpc_id
-  public_subnet_ids         = module.vpc.public_subnets
-  private_subnet_ids        = module.vpc.private_subnets
-  web_security_group_id     = module.security.web_security_group_id
-  ec2_instance_profile_name = module.security.ec2_instance_profile_name
-  db_secret_name           = module.database.db_secret_name
+  project_name                = var.project_name
+  environment                = var.environment
+  aws_region                 = var.aws_region
+  vpc_id                     = module.vpc.vpc_id
+  public_subnet_ids          = module.vpc.public_subnets
+  private_subnet_ids         = module.vpc.private_subnets
+  web_security_group_id      = module.security.web_security_group_id
+  ec2_rds_security_group_id  = module.security.ec2_rds_security_group_id
+  ec2_instance_profile_name  = module.security.ec2_instance_profile_name
+  db_secret_name            = module.database.db_secret_name
 
   instance_type     = var.instance_type
   key_pair_name     = var.key_pair_name

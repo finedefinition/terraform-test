@@ -37,9 +37,9 @@ resource "aws_s3_bucket_public_access_block" "app_files" {
 # Upload application files
 resource "aws_s3_object" "backend_app" {
   bucket = aws_s3_bucket.app_files.id
-  key    = "backend/app-secure.py"
-  source = "${path.root}/../../applications/backend/app-secure.py"
-  etag   = filemd5("${path.root}/../../applications/backend/app-secure.py")
+  key    = "backend/app.py"
+  source = "${path.root}/../../applications/backend/app.py"
+  etag   = filemd5("${path.root}/../../applications/backend/app.py")
 
   tags = var.default_tags
 }
@@ -53,14 +53,6 @@ resource "aws_s3_object" "backend_requirements" {
   tags = var.default_tags
 }
 
-resource "aws_s3_object" "backend_migrate" {
-  bucket = aws_s3_bucket.app_files.id
-  key    = "backend/migrate.py"
-  source = "${path.root}/../../applications/database/migrate.py"
-  etag   = filemd5("${path.root}/../../applications/database/migrate.py")
-
-  tags = var.default_tags
-}
 
 resource "aws_s3_object" "frontend_html" {
   bucket = aws_s3_bucket.app_files.id
@@ -73,18 +65,18 @@ resource "aws_s3_object" "frontend_html" {
 
 resource "aws_s3_object" "docker_compose" {
   bucket = aws_s3_bucket.app_files.id
-  key    = "docker-compose-secure.yml"
-  source = "${path.root}/../../applications/docker-compose-secure.yml"
-  etag   = filemd5("${path.root}/../../applications/docker-compose-secure.yml")
+  key    = "docker-compose.yml"
+  source = "${path.root}/../../configs/docker-compose.yml"
+  etag   = filemd5("${path.root}/../../configs/docker-compose.yml")
 
   tags = var.default_tags
 }
 
 resource "aws_s3_object" "nginx_config" {
   bucket = aws_s3_bucket.app_files.id
-  key    = "nginx-secure.conf"
-  source = "${path.root}/../../applications/nginx-secure.conf"
-  etag   = filemd5("${path.root}/../../applications/nginx-secure.conf")
+  key    = "nginx.conf"
+  source = "${path.root}/../../configs/nginx.conf"
+  etag   = filemd5("${path.root}/../../configs/nginx.conf")
 
   tags = var.default_tags
 }

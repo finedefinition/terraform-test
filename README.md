@@ -1,179 +1,192 @@
-# AWS VPC Terraform Configuration
+# AWS Terraform Infrastructure Project
 
-This Terraform configuration creates a VPC in AWS with public and private subnets across multiple availability zones using native AWS resources and modular structure.
+Повна AWS інфраструктура з веб-додатком, базою даних та CloudFront CDN, розгорнута за допомогою Terraform.
 
-## Project Structure
+## Структура проекту
 
 ```
 terraform-test/
-├── main.tf                     # Root module - orchestrates all modules
-├── providers.tf                # Provider configurations
-├── backend.tf                  # S3 backend configuration
-├── variables.tf                # Root-level input variables
-├── outputs.tf                  # Root-level outputs
-├── terraform.tfvars.example    # Example variable values
-├── backend-config.hcl.example  # Example backend configuration
-├── README.md                   # This file
-├── .gitignore                  # Git ignore patterns
-└── modules/
-    ├── vpc/                    # VPC module
-    │   ├── main.tf             # VPC resources (terraform-aws-modules)
-    │   ├── variables.tf        # Module input variables
-    │   └── outputs.tf          # Module outputs
-    └── s3/                     # S3 module
-        ├── main.tf             # S3 bucket and IAM for configs
-        ├── variables.tf        # Module input variables
-        └── outputs.tf          # Module outputs
+├── environments/
+│   ├── dev/                    # Development environment
+│   │   ├── main.tf
+│   │   ├── terraform.tfvars    # Налаштування для dev
+│   │   └── outputs.tf
+│   └── prod/                   # Production environment
+│       ├── main.tf
+│       ├── terraform.tfvars
+│       └── outputs.tf
+├── shared/
+│   └── modules/
+│       ├── vpc/                # VPC and networking
+│       ├── security/           # Security groups and IAM
+│       ├── database/           # RDS PostgreSQL
+│       ├── compute/            # EC2, ALB, Auto Scaling
+│       ├── s3-apps/            # S3 buckets for applications
+│       └── cloudfront/         # CloudFront CDN
+├── applications/
+│   ├── backend/                # Flask backend application
+│   └── database/               # Database migrations
+└── configs/
+    ├── docker-compose.yml      # Docker configuration
+    └── nginx.conf              # Nginx configuration
 ```
 
-## Features
+## Архітектура інфраструктури
 
-- **Modular Architecture**: VPC resources organized in dedicated module
-- **Terraform AWS Modules**: Uses proven `terraform-aws-modules/vpc/aws` module  
-- **Multi-AZ Setup**: Public and private subnets across multiple availability zones
-- **NAT Gateway**: Optional NAT Gateway for private subnet internet access
-- **VPN Gateway**: Optional VPN Gateway for site-to-site connections
-- **S3 Backend**: State storage with native S3 locking
-- **Comprehensive Tagging**: Consistent resource tagging strategy
-- **Project-based Naming**: Resources named with project prefix
+### Компоненти системи:
+- **Frontend**: Статичні файли в S3 + CloudFront CDN
+- **Backend**: Flask API в Docker контейнерах на EC2
+- **Database**: PostgreSQL RDS в приватних сабнетах
+- **Load Balancer**: Application Load Balancer
+- **Security**: WAF, Security Groups, IAM ролі
+- **Monitoring**: CloudWatch логи та метрики
 
-## Prerequisites
+### Мережева архітектура:
+- **VPC**: Ізольована мережа в AWS
+- **Public Subnets**: ALB, NAT Gateway
+- **Private Subnets**: EC2 instances, RDS
+- **Multi-AZ**: Розподіл по зонам доступності
 
-1. AWS CLI configured with appropriate credentials
-2. Terraform installed (>= 1.0)
-3. S3 bucket for state storage (create manually)
+## Ініціалізація проекту
 
-## Setup
+### 1. Підготовка backend налаштувань
 
-### 1. Create S3 Backend Resources (Manual)
+Створіть файл `backend-config.hcl`:
+```hcl
+bucket = "your-terraform-state-bucket"
+key    = "dev/terraform.tfstate"
+region = "eu-central-1"
+encrypt = true
+use_lockfile = true
+```
 
-Create the S3 bucket for state management (no DynamoDB needed with S3 native locking):
+### 2. Налаштування змінних
+
+Відредагуйте `environments/dev/terraform.tfvars`:
+```hcl
+# Основні налаштування
+project_name = "my-project"
+environment  = "dev"
+aws_region   = "eu-central-1"
+
+# Мережа
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["eu-central-1a", "eu-central-1b"]
+public_subnets     = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnets    = ["10.0.11.0/24", "10.0.12.0/24"]
+
+# Безпека
+admin_cidr = "YOUR_PUBLIC_IP/32"  # ЗАМІНІТЬ на вашу IP адресу
+
+# База даних
+db_instance_class           = "db.t3.micro"
+db_allocated_storage        = 20
+db_max_allocated_storage    = 50
+db_engine_version           = "17.4"
+enable_enhanced_monitoring  = false
+enable_performance_insights = false
+
+# Обчислювальні ресурси
+instance_type    = "t3.micro"
+min_size         = 1
+max_size         = 2
+desired_capacity = 1
+
+# Теги
+default_tags = {
+  Project     = "my-project"
+  Environment = "dev"
+  ManagedBy   = "terraform"
+  CostCenter  = "development"
+}
+```
+
+### 3. Розгортання інфраструктури
 
 ```bash
-# Create S3 bucket (replace with your unique bucket name)
-aws s3 mb s3://your-terraform-state-bucket --region us-west-2
+# Перейдіть в директорію середовища
+cd environments/dev
 
-# Enable versioning (recommended for state files)
-aws s3api put-bucket-versioning \
-  --bucket your-terraform-state-bucket \
-  --versioning-configuration Status=Enabled
+# Ініціалізація Terraform
+terraform init -backend-config=../../backend-config.hcl
+
 ```
 
-### 2. Configure Backend
+## Тестування системи
 
-1. Copy the example backend configuration:
-   ```bash
-   cp backend-config.hcl.example backend-config.hcl
-   ```
-
-2. Edit `backend-config.hcl` with your actual values:
-   ```hcl
-   bucket       = "your-actual-terraform-state-bucket"
-   key          = "vpc/terraform.tfstate"
-   region       = "us-west-2"
-   encrypt      = true
-   use_lockfile = true  # S3 native locking (no DynamoDB needed)
-   ```
-
-### 3. Configure Variables
-
-1. Copy the example variables file:
-   ```bash
-   cp terraform.tfvars.example terraform.tfvars
-   ```
-
-2. Edit `terraform.tfvars` with your specific values.
-
-### 4. Deploy
+### 1. Отримання URL для перевірки
 
 ```bash
-# Initialize Terraform with backend configuration
-terraform init -backend-config=backend-config.hcl
-
-# Plan the deployment
-terraform plan
-
-# Apply the configuration
-terraform apply
+# Отримайте CloudFront URL
+terraform output cloudfront_url
 ```
 
-## Configuration
+### 2. Перевірка компонентів
 
-### Root Variables
+Після успішного розгортання, використовуйте наступні URL для тестування:
 
-- `project_name`: Name of your project (used in resource naming)
-- `environment`: Environment (dev, staging, prod)
-- `aws_region`: AWS region to deploy resources
-- `vpc_cidr`: CIDR block for the VPC
-- `availability_zones`: List of AZs to use
-- `public_subnets`: CIDR blocks for public subnets
-- `private_subnets`: CIDR blocks for private subnets
-- `enable_nat_gateway`: Enable NAT Gateway for private subnets
-- `enable_vpn_gateway`: Enable VPN Gateway
-- `app_configs_bucket_name`: Name of S3 bucket for application configs
-- `default_tags`: Default tags applied to all resources
+#### Frontend (CloudFront):
+```bash
+# Головна сторінка
+curl https://your-cloudfront-url.cloudfront.net/
 
-### VPC Module
+# Або відкрийте в браузері
+https://your-cloudfront-url.cloudfront.net/
+```
 
-The VPC module creates:
-- VPC with DNS hostnames and support enabled
-- Internet Gateway
-- Public subnets with public IP mapping
-- Private subnets
-- Route tables and associations
-- NAT Gateways (optional, one per AZ)
-- Elastic IPs for NAT Gateways
-- VPN Gateway (optional)
+#### Backend API через CloudFront:
+```bash
+# Health check
+curl https://your-cloudfront-url.cloudfront.net/health
 
-### S3 Module
+# API endpoint
+curl https://your-cloudfront-url.cloudfront.net/api/hello
 
-The S3 module creates:
-- S3 bucket for application configurations (nginx, docker-compose)
-- Bucket versioning and encryption
-- IAM role and policy for EC2 to access the bucket
-- Instance profile for EC2 instances
+# Тест підключення до бази даних
+curl https://your-cloudfront-url.cloudfront.net/api/db-test
+```
 
-### Outputs
+#### Тестування через ALB (напряму):
+```bash
+# Отримайте ALB URL
+terraform output alb_dns_name
 
-The configuration provides comprehensive outputs including:
-- VPC ID, CIDR, and ARN
-- Subnet IDs and CIDRs (public and private)
-- Gateway IDs (Internet, NAT, VPN)
-- Route table IDs
-- NAT Gateway public IPs
-- S3 bucket name and ARN for application configs
-- IAM instance profile for EC2
+# Тестування
+curl http://your-alb-url.eu-central-1.elb.amazonaws.com/health
+curl http://your-alb-url.eu-central-1.elb.amazonaws.com/api/hello
+curl http://your-alb-url.eu-central-1.elb.amazonaws.com/api/db-test
+```
 
-## Resource Naming Convention
+### 3. Перевірка на сервері
 
-All resources follow the pattern: `${project_name}-<resource-type>-<identifier>`
+Якщо підключились до EC2 через SSH:
+```bash
+# Локальне тестування
+curl http://localhost/health
+curl http://localhost/api/hello
+curl http://localhost/api/db-test
 
-Examples:
-- `my-project-vpc`
-- `my-project-public-subnet-1`
-- `my-project-nat-gateway-1`
+```
 
-## Security Best Practices
+## Безпека
 
-- State file is encrypted in S3
-- Native S3 locking prevents concurrent modifications
-- All resources are properly tagged
-- Private subnets for secure resources
-- NAT Gateway for controlled outbound internet access
-- Separate route tables for public and private subnets
+- **RDS**: Розміщена в приватних сабнетах
+- **Security Groups**: Мінімальні необхідні права доступу
+- **IAM**: Ролі з обмеженими правами
+- **WAF**: Захист від web-атак
+- **Encryption**: Шифрування в спокої та при передачі
 
-## Module Development
+## Підтримка
 
-To add new modules:
-1. Create directory under `modules/`
-2. Follow the three-file pattern: `main.tf`, `variables.tf`, `outputs.tf`
-3. Add module instantiation to root `main.tf`
-4. Update root `variables.tf` and `outputs.tf` as needed
+- Backup бази даних налаштовано автоматично
+- State файли зберігаються в S3 з шифруванням
 
-## Clean Up
+## Очищення ресурсів
+ 
+**Увага**: Перед видаленням переконайтесь, що ви зберегли всі важливі дані з бази даних.
 
 ```bash
-terraform destroy
+# Видалення всієї інфраструктури
+terraform destroy -var-file=terraform.tfvars
 ```
 
-Note: You may need to manually delete the S3 bucket after destroying the infrastructure.

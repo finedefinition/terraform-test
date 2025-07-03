@@ -136,6 +136,16 @@ resource "aws_s3_bucket_policy" "frontend" {
   })
 }
 
+resource "aws_s3_object" "index_html" {
+  bucket = aws_s3_bucket.frontend.id
+  key    = "index.html"
+  source = "${path.root}/../../applications/frontend/public/index.html"
+  etag   = filemd5("${path.root}/../../applications/frontend/public/index.html")
+  content_type = "text/html"
+
+  tags = var.default_tags
+}
+
 resource "aws_cloudfront_distribution" "main" {
 
   origin {
@@ -251,4 +261,10 @@ resource "aws_cloudfront_distribution" "main" {
     Name = "${var.project_name}-cloudfront"
     Type = "CDN"
   })
+
+  lifecycle {
+    ignore_changes = [
+      origin
+    ]
+  }
 }

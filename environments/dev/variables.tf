@@ -73,7 +73,6 @@ variable "admin_cidr" {
   }
 }
 
-# Database variables
 variable "db_instance_class" {
   description = "RDS instance class"
   type        = string
@@ -122,7 +121,6 @@ variable "enable_performance_insights" {
   default     = false  # Disabled for dev to save costs
 }
 
-# Compute variables
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
@@ -144,11 +142,11 @@ variable "min_size" {
 variable "max_size" {
   description = "Maximum number of instances in ASG"
   type        = number
-  default     = 2  # Lower for dev
+  default     = 2
 }
 
 variable "desired_capacity" {
   description = "Desired number of instances in ASG"
   type        = number
-  default     = 1  # Single instance for dev
+  default     = 1
 }

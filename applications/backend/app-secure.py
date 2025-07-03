@@ -9,7 +9,6 @@ from botocore.exceptions import ClientError
 
 app = Flask(__name__)
 
-# Input validation patterns
 EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
 NAME_PATTERN = re.compile(r'^[a-zA-Z\s\-\']{1,100}$')
 

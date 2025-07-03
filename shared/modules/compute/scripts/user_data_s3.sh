@@ -35,8 +35,8 @@ systemctl start amazon-ssm-agent
 umask 077
 
 # Create application directory
-mkdir -p /opt/app
-cd /opt/app
+mkdir -p /home/ec2-user/app
+cd /home/ec2-user/app
 
 # Create minimal .env file (no secrets)
 cat > .env <<EOF
@@ -52,24 +52,21 @@ echo "$(date): Downloading application files from S3"
 S3_BUCKET="${project_name}-app-files-${environment}"
 
 # Create directory structure
-mkdir -p frontend/public backend configs/nginx
+mkdir -p frontend/public backend configs
 
 # Download files from S3
 aws s3 cp s3://$S3_BUCKET/frontend/index.html frontend/public/index.html --region ${region}
-aws s3 cp s3://$S3_BUCKET/backend/app-secure.py backend/app-secure.py --region ${region}
+aws s3 cp s3://$S3_BUCKET/backend/app.py backend/app.py --region ${region}
 aws s3 cp s3://$S3_BUCKET/backend/requirements.txt backend/requirements.txt --region ${region}
-aws s3 cp s3://$S3_BUCKET/backend/migrate.py backend/migrate.py --region ${region}
-aws s3 cp s3://$S3_BUCKET/docker-compose-secure.yml docker-compose.yml --region ${region}
-aws s3 cp s3://$S3_BUCKET/nginx-secure.conf configs/nginx/nginx.conf --region ${region}
-
-# Make migration script executable
-chmod +x backend/migrate.py
+aws s3 cp s3://$S3_BUCKET/docker-compose.yml docker-compose.yml --region ${region}
+aws s3 cp s3://$S3_BUCKET/nginx.conf configs/nginx.conf --region ${region}
 
 # Set secure permissions
-chown -R ec2-user:ec2-user /opt/app
+chown -R ec2-user:ec2-user /home/ec2-user/app
 
 # Start application
 echo "$(date): Starting application with Docker Compose"
+cd /home/ec2-user/app
 docker-compose up -d
 
 # Wait and verify

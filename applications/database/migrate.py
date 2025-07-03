@@ -39,8 +39,10 @@ def get_db_connection():
         return None
     
     try:
+        # AWS RDS uses 'endpoint' instead of 'host'
+        host = credentials.get('endpoint') or credentials.get('host')
         conn = psycopg2.connect(
-            host=credentials['host'],
+            host=host,
             port=credentials['port'],
             database=credentials['dbname'],
             user=credentials['username'],
@@ -49,6 +51,7 @@ def get_db_connection():
         return conn
     except Exception as e:
         print(f"Database connection error: {e}")
+        print(f"Available credentials keys: {list(credentials.keys()) if credentials else 'None'}")
         return None
 
 def create_migrations_table(conn):

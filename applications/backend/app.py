@@ -12,37 +12,77 @@ def get_db_credentials():
     secret_name = os.environ.get('DB_SECRET_NAME', 'my-project-db-password')
     region_name = os.environ.get('AWS_DEFAULT_REGION', 'eu-central-1')
     
+    print(f"[LOG] Attempting to retrieve secret: {secret_name} from region: {region_name}")
+    
+    # Use EC2 instance metadata for credentials in Docker
     session = boto3.session.Session()
     client = session.client(
         service_name='secretsmanager',
-        region_name=region_name
+        region_name=region_name,
+        # Force use of instance metadata
+        aws_access_key_id=None,
+        aws_secret_access_key=None
     )
     
     try:
+        print(f"[LOG] Calling Secrets Manager for secret: {secret_name}")
         response = client.get_secret_value(SecretId=secret_name)
         secret = json.loads(response['SecretString'])
+        print(f"[LOG] Successfully retrieved secret with keys: {list(secret.keys())}")
+        print(f"[LOG] Database endpoint: {secret.get('endpoint', 'NOT_FOUND')}")
+        print(f"[LOG] Database port: {secret.get('port', 'NOT_FOUND')}")
+        print(f"[LOG] Database name: {secret.get('dbname', 'NOT_FOUND')}")
+        print(f"[LOG] Database username: {secret.get('username', 'NOT_FOUND')}")
         return secret
     except ClientError as e:
-        print(f"Error retrieving secret: {e}")
+        print(f"[ERROR] Error retrieving secret: {e}")
+        print(f"[ERROR] Error code: {e.response['Error']['Code']}")
+        print(f"[ERROR] Error message: {e.response['Error']['Message']}")
+        return None
+    except Exception as e:
+        print(f"[ERROR] Unexpected error retrieving secret: {e}")
         return None
 
 def get_db_connection():
     """Create database connection"""
+    print(f"[LOG] Starting database connection process...")
     credentials = get_db_credentials()
     if not credentials:
+        print(f"[ERROR] No credentials received from Secrets Manager")
         return None
     
     try:
+        # AWS RDS uses 'endpoint' instead of 'host'
+        host = credentials.get('endpoint') or credentials.get('host')
+        port = credentials['port']
+        database = credentials['dbname']
+        user = credentials['username']
+        
+        print(f"[LOG] Attempting to connect to database:")
+        print(f"[LOG] Host: {host}")
+        print(f"[LOG] Port: {port}")
+        print(f"[LOG] Database: {database}")
+        print(f"[LOG] User: {user}")
+        
         conn = psycopg2.connect(
-            host=credentials['host'],
-            port=credentials['port'],
-            database=credentials['dbname'],
-            user=credentials['username'],
-            password=credentials['password']
+            host=host,
+            port=port,
+            database=database,
+            user=user,
+            password=credentials['password'],
+            connect_timeout=10
         )
+        print(f"[LOG] Successfully connected to database!")
         return conn
+    except psycopg2.OperationalError as e:
+        print(f"[ERROR] PostgreSQL operational error: {e}")
+        print(f"[ERROR] This usually indicates network connectivity or authentication issues")
+        return None
+    except psycopg2.Error as e:
+        print(f"[ERROR] PostgreSQL error: {e}")
+        return None
     except Exception as e:
-        print(f"Database connection error: {e}")
+        print(f"[ERROR] Unexpected database connection error: {e}")
         return None
 
 @app.route('/health', methods=['GET'])
@@ -62,7 +102,7 @@ def hello_world():
 
 @app.route('/api/db-test', methods=['GET'])
 def database_test():
-    """Test database connection and show table info"""
+    """Test database connection"""
     conn = get_db_connection()
     if not conn:
         return jsonify({
@@ -77,24 +117,9 @@ def database_test():
         cursor.execute("SELECT version();")
         db_version = cursor.fetchone()[0]
         
-        # Check if users table exists
-        cursor.execute("""
-            SELECT COUNT(*) FROM information_schema.tables 
-            WHERE table_name = 'users'
-        """)
-        table_exists = cursor.fetchone()[0] > 0
-        
-        if table_exists:
-            cursor.execute("SELECT COUNT(*) FROM users")
-            user_count = cursor.fetchone()[0]
-        else:
-            user_count = 0
-        
         return jsonify({
             'status': 'success',
             'database_version': db_version,
-            'users_table_exists': table_exists,
-            'user_count': user_count,
             'message': 'Database connection successful'
         })
         
@@ -166,4 +191,5 @@ def create_user():
         conn.close()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=80, debug=False)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=False)

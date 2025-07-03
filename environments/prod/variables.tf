@@ -73,7 +73,6 @@ variable "admin_cidr" {
   }
 }
 
-# Database variables
 variable "db_instance_class" {
   description = "RDS instance class"
   type        = string
@@ -122,7 +121,6 @@ variable "enable_performance_insights" {
   default     = false  # Disabled for dev to save costs
 }
 
-# Compute variables
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
